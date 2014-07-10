@@ -13,10 +13,11 @@ using System.IO;
 using RepetierHost.view.utils;
 using System.Timers;
 using RepetierHost.view;
+using System.Diagnostics;
 
 namespace RepetierHost.connector
 {
-    
+
     public class SerialConnector : PrinterConnectorBase, INotifyPropertyChanged, IDisposable
     {
         private class NackData
@@ -53,7 +54,7 @@ namespace RepetierHost.connector
         private int doRunStartCommands = -1;
         PrinterConnection con;
         //System.Text.ASCIIEncoding enc = new System.Text.ASCIIEncoding();
-        Encoding enc = System.Text.Encoding.GetEncoding(1252); 
+        Encoding enc = System.Text.Encoding.GetEncoding(1252);
 
         // ----------- Connection handline variables -------------
 
@@ -107,9 +108,9 @@ namespace RepetierHost.connector
                 port = "/dev/ttyUSB0";
 
         }
-        protected virtual void Dispose(bool disposing) 
+        protected virtual void Dispose(bool disposing)
         {
-            if (disposing) 
+            if (disposing)
             {
                 if(panel!=null)
                     panel.Dispose();
@@ -191,6 +192,21 @@ namespace RepetierHost.connector
             }
 
         }
+
+        // set baud rate using python, since mono only supports ansi baud rates
+        private void ForceSetBaudRate()
+        {
+            if (Main.IsMono) {
+                string arg = String.Format("-c \"import serial; serial.Serial('{0}', {1})\"", port, baudRate);
+                var proc = new Process {
+                    EnableRaisingEvents = false,
+                    StartInfo = {FileName = @"python", Arguments = arg}
+                };
+                proc.Start();
+                proc.WaitForExit();
+            }
+        }
+
         public override bool Connect()
         {
             resendError = 0;
@@ -226,6 +242,7 @@ namespace RepetierHost.connector
                     serial.RtsEnable = false;
                 }
                 serial.Open();
+                ForceSetBaudRate();
                 if (writeThread == null)
                 {
                     writeThread = new Thread(new ThreadStart(this.WriteLoop));
@@ -569,7 +586,7 @@ namespace RepetierHost.connector
                 con.open();
             }
             else if (resetOnEmergency == 1)
-            {                
+            {
                 //serial.DtrEnable = !serial.DtrEnable;
                 serial.DtrEnable = true;
                 serial.RtsEnable = true;
@@ -623,7 +640,7 @@ namespace RepetierHost.connector
             if (eventPauseChanged != null)
             {
                 eventPauseChanged(true);
-            } 
+            }
         }
         public override void ContinueJob()
         {
